@@ -1,48 +1,46 @@
 
 const express = require('express')
+const { PrismaClient } = require('@prisma/client')
+
+const prisma = new PrismaClient()
 const app = express()
 app.use(express.json())
 
 
-let users = []
-let nextid = 1 
-
-
 
 //Rota para retornar todos os usuários ################################################################
-app.get("/users", (req, res) => {
+app.get("/users", async (req, res) => {
+    const users = await prisma.user.findMany()
     res.json(users)
 })
 
 
 
 //Rota para criar um usuário ###########################################################################
-app.post("/users" , (req,res) => {
-    const {name, email} = req.body;
+app.post("/users", async (req, res) => {
+    const { name, email } = req.body;
 
-    if(!name || !email){
-        return res.status(400).json({error: "Name e email são obrigados"})
+    if (!name || !email) {
+        return res.status(400).json({ error: "Name e email são obrigados" })
     }
 
-
-    const newUser = {
-        id: nextid++,
-        name: name,
-        email: email
-    }
-
-    users.push(newUser)
-    res.status(201).json(newUser)
+    const user = await prisma.user.create({
+        data: {
+            name,
+            email
+        }
+    })
+    res.status(201).json(user)
 })
 
 
 
-app.get("/user/:id", (req, res) => {
-    const { id } = req.params 
-    const user = users.find((u) => u.id === parseInt (id))
-    
-    if(!user){
-        return res.status(404).json({error:"Usuário não encontrado"})
+app.get("/user/:id", async (req, res) => {
+    const id = parseInt(req.params.id)
+    const user = await prisma.user.findUnique({ where: { id } })
+
+    if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" })
     }
 
     res.json(user)
@@ -51,16 +49,17 @@ app.get("/user/:id", (req, res) => {
 
 
 //Rota para deletar um usuário pelo ID ################################################################
-app.delete("/user/:id", (req,res) => {
-    const {id} = req.params
+app.delete("/user/:id", async (req, res) => {
+    const id = parseInt(req.params.id)
+    const user = await prisma.user.findUnique({ where: { id } })
 
-    const user = users.find((u) => u.id === parseInt (id))
-    
-    if(!user){
-        return res.status(404).json({error:"Usuário não encontrado"})
+    if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" })
     }
 
-    users = users.filter((u) => u.id != id)
+    await prisma.user.delete({
+        where: { id }
+    })
     res.status(204).send()
 
 })
@@ -68,26 +67,30 @@ app.delete("/user/:id", (req,res) => {
 
 
 //Rota para atualizar o usuário pelo ID ##################################################################
-app.put("/user/:id", (req, res) => {
-    const { id } = req.params
-    const user = users.find((u) => u.id == id)
-    const {name, email} = req.body
+app.put("/user/:id", async (req, res) => {
+    const id = parseInt(req.params.id)
+    const user = prisma.user.findUnique({
+        where: { id }
+    })
 
-    if(!user){
-        return res.status(404).json({error:"Usuário não encontrado"})
+    if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" })
     }
 
+    const { name, email } = req.body
 
-    if(name){
-        user.name = name
-    }
+    const updatedUser = await prisma.user.update({
+        where: { id },
+        data: {
+            name,
+            email
+        }
+    })
 
-    if(email){
-        user.email = email
-    }
+    res.json(updatedUser)
 
-    res.json(user)
 })
+
 
 app.listen(3000, () => {
     console.log("server is running on 3000")
